@@ -26,6 +26,9 @@ if config.config_file_name is not None:
 # contains their table definitions.
 from app.models.clinic import Clinic  # noqa: F401
 from app.models.user import User  # noqa: F401
+from app.models.doctor import Doctor  # noqa: F401
+from app.models.service import Service  # noqa: F401
+from app.models.doctor_working_hour import DoctorWorkingHour  # noqa: F401
 
 target_metadata = Base.metadata
 

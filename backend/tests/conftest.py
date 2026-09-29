@@ -33,6 +33,9 @@ from app.db.session import get_db
 # Import all models so Base.metadata includes their tables
 from app.models.clinic import Clinic  # noqa: F401
 from app.models.user import User  # noqa: F401
+from app.models.doctor import Doctor  # noqa: F401
+from app.models.service import Service  # noqa: F401
+from app.models.doctor_working_hour import DoctorWorkingHour  # noqa: F401
 
 
 # ---------------------------------------------------------------------------
@@ -81,10 +84,18 @@ def setup_database():
 async def clean_data(setup_database):
     """Delete all row data after each test for isolation.
 
-    Deletes in FK-safe order: users first (has FK to clinics), then clinics.
+    Deletes in FK-safe order:
+    1. doctor_working_hours (has FK to doctors and clinics)
+    2. doctors (has FK to clinics)
+    3. services (has FK to clinics)
+    4. users (has FK to clinics)
+    5. clinics
     """
     yield
     async with test_engine.begin() as conn:
+        await conn.execute(text("DELETE FROM doctor_working_hours"))
+        await conn.execute(text("DELETE FROM doctors"))
+        await conn.execute(text("DELETE FROM services"))
         await conn.execute(text("DELETE FROM users"))
         await conn.execute(text("DELETE FROM clinics"))
 
