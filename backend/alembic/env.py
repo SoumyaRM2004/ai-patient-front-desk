@@ -22,8 +22,11 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Target metadata for autogenerate support.
-# When models are added (Phase 2+), they must be imported before this line
-# so that Base.metadata contains their table definitions.
+# Models must be imported before this line so that Base.metadata
+# contains their table definitions.
+from app.models.clinic import Clinic  # noqa: F401
+from app.models.user import User  # noqa: F401
+
 target_metadata = Base.metadata
 
 

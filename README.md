@@ -2,20 +2,22 @@
 
 Multi-tenant SaaS application for clinic patient communication via WhatsApp.
 
-> **Current status: Phase 1 — Project Foundation**
+> **Current status: Phase 2 — Authentication & Multi-Tenant Architecture**
 >
-> FastAPI application connected to PostgreSQL with Alembic migration framework.
-> No models, authentication, business logic, or AI functionality yet.
+> Multi-tenant foundation with clinic registration, owner accounts, Argon2 password hashing, HS256 JWT tokens, and strict tenant isolation. Verified with 16 automated tests.
 
 ---
 
-## What Works in Phase 1
+## What Works in Phase 2
 
-- FastAPI application starts and serves requests
-- PostgreSQL connection via async SQLAlchemy
-- Health endpoint verifying database connectivity
-- Alembic migration framework initialized (no revisions yet)
-- OpenAPI documentation auto-generated at `/docs`
+- **Clinic & User Registration** (`POST /api/v1/auth/register`): Atomic transaction creating clinic + owner user with password hashed via Argon2 (`pwdlib`).
+- **Authentication & Login** (`POST /api/v1/auth/login`): Verifies credentials, returns signed HS256 JWT containing `sub` (user UUID), `iat`, and `exp`.
+- **Protected Endpoints** (`GET /api/v1/auth/me`): Validates Bearer token via `OAuth2PasswordBearer`, verifies user active status and loads clinic context.
+- **Tenant Isolation**: Foreign key constraints and `clinic_id` scoping ensure clinics cannot access data outside their organization.
+- **Alembic Database Migrations**: Auto-generated revision `2fef91c74a30_create_clinics_and_users.py` with timezone-aware timestamp columns.
+- **Comprehensive Automated Test Suite**: 16 async tests running against isolated test database (`ai_patient_frontdesk_test`).
+
+---
 
 ## Prerequisites
 
@@ -27,228 +29,190 @@ Multi-tenant SaaS application for clinic patient communication via WhatsApp.
 
 ## Setup Instructions
 
-### 1. Create the Database
+### 1. Create the Databases (Main + Test)
 
-Open a terminal and connect to your local PostgreSQL server using `psql`:
-
-**Windows PowerShell:**
+Open Windows PowerShell and connect to your local PostgreSQL server:
 
 ```powershell
 psql -U postgres
 ```
 
-Enter your PostgreSQL password when prompted. Then create the database:
+Enter your PostgreSQL password when prompted. Then create both databases:
 
 ```sql
 CREATE DATABASE ai_patient_frontdesk;
+CREATE DATABASE ai_patient_frontdesk_test;
 ```
 
-Verify it was created:
+Verify both were created:
 
 ```sql
 \l
 ```
 
-You should see `ai_patient_frontdesk` in the list. Exit `psql`:
+Exit `psql`:
 
 ```sql
 \q
 ```
 
-> If `psql` is not on your PATH, find it at
-> `C:\Program Files\PostgreSQL\17\bin\psql.exe` (typical default installation path).
+### 2. Virtual Environment & Dependencies
 
-### 2. Create a Python Virtual Environment
-
-**Windows PowerShell:**
+From the `backend/` directory:
 
 ```powershell
 cd backend
 python -m venv venv
 .\venv\Scripts\Activate.ps1
-```
-
-> If you get an execution policy error, run:
-> ```powershell
-> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-> ```
-
-**Linux / macOS:**
-
-```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 3. Install Dependencies
-
-```bash
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
-### 4. Configure Environment Variables
-
-**Windows PowerShell:**
+### 3. Configure Environment Variables
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-**Linux / macOS:**
+Edit `backend/.env` with your actual PostgreSQL credentials and a secure dev JWT secret (minimum 32 bytes):
 
-```bash
-cp .env.example .env
-```
-
-Now edit `.env` and replace `YOUR_PASSWORD` with your actual PostgreSQL password:
-
-```
+```env
 DATABASE_URL=postgresql+asyncpg://postgres:YOUR_PASSWORD@localhost:5432/ai_patient_frontdesk
+TEST_DATABASE_URL=postgresql+asyncpg://postgres:YOUR_PASSWORD@localhost:5432/ai_patient_frontdesk_test
+
+APP_NAME=AI Patient Front Desk
+VERSION=0.1.0
+DEBUG=true
+
+JWT_SECRET_KEY=dev-secret-key-change-this-in-production-minimum-32-bytes
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
 ```
 
-### 5. Start the Application
+### 4. Run Database Migrations
 
-```bash
-uvicorn app.main:app --reload --port 8000
+Apply the migration to create `clinics` and `users` tables:
+
+```powershell
+alembic upgrade head
 ```
 
-You should see:
+Verify migration status:
 
-```
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+```powershell
+alembic current
 ```
 
 ---
 
 ## Verification
 
-### Health Endpoint
+### 1. Run Automated Test Suite
 
-**Windows PowerShell:**
+Run the full async test suite against the test database:
 
+```powershell
+pytest -v
+```
+
+**Expected output:**
+```
+============================= 16 passed in X.XXs ==============================
+```
+
+All 16 test cases cover:
+- Registration success, duplicate email rejection, Argon2 hashing, password length validation
+- Login success, invalid credentials, inactive user rejection
+- Token validation (missing token, invalid signature, expired token, missing `sub`, inactive user with valid token)
+- Tenant isolation (separate clinics isolated, user belongs to correct clinic)
+
+### 2. Start the Application
+
+```powershell
+uvicorn app.main:app --reload --port 8000
+```
+
+### 3. Test Endpoints
+
+#### Health Check
 ```powershell
 Invoke-RestMethod http://localhost:8000/api/v1/health
 ```
-
-**Linux / macOS:**
-
-```bash
-curl http://localhost:8000/api/v1/health
-```
-
-**Expected response:**
-
+Response:
 ```json
-{
-  "status": "healthy",
-  "database": "connected",
-  "version": "0.1.0"
-}
+{"status": "healthy", "database": "connected", "version": "0.1.0"}
 ```
 
-### OpenAPI Documentation
+#### Register Clinic & Owner
+```powershell
+$body = @{
+  clinic_name = "Sunrise Health"
+  owner_name  = "Dr. Smith"
+  email       = "smith@sunrisehealth.com"
+  password    = "SecurePass123"
+} | ConvertTo-Json
 
-Open in browser: [http://localhost:8000/docs](http://localhost:8000/docs)
-
-### Alembic Verification
-
-From the `backend/` directory (with venv activated):
-
-```bash
-alembic current
+Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/auth/register -ContentType "application/json" -Body $body
 ```
 
-Expected output: empty (no migrations exist yet — models are introduced in Phase 2).
+#### Login & Retrieve Current User
+```powershell
+$loginBody = @{
+  email    = "smith@sunrisehealth.com"
+  password = "SecurePass123"
+} | ConvertTo-Json
 
-```bash
-alembic heads
+$loginResponse = Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/auth/login -ContentType "application/json" -Body $loginBody
+$token = $loginResponse.access_token
+
+Invoke-RestMethod -Method Get -Uri http://localhost:8000/api/v1/auth/me -Headers @{ Authorization = "Bearer $token" }
 ```
 
-Expected output: empty (no revisions).
+### 4. Interactive OpenAPI Docs
 
-This confirms Alembic can connect to the database and is properly configured.
+Visit [http://localhost:8000/docs](http://localhost:8000/docs) in your browser. The "Authorize" button supports testing protected endpoints via Bearer token.
 
 ---
 
-## Project Structure (Phase 1)
+## Project Structure (Phase 2)
 
 ```
 AI Patient Front Desk/
-├── docker-compose.yml          # Available for future phases (not required now)
+├── docker-compose.yml
 ├── README.md
 ├── .gitignore
 └── backend/
-    ├── .env.example            # Environment variable template
-    ├── requirements.txt        # Python dependencies
-    ├── Dockerfile              # Container build (future use)
-    ├── alembic.ini             # Alembic configuration
+    ├── .env.example
+    ├── requirements.txt
+    ├── requirements-dev.txt
+    ├── pyproject.toml
+    ├── alembic.ini
     ├── alembic/
-    │   ├── env.py              # Async migration environment
-    │   ├── script.py.mako      # Migration script template
-    │   └── versions/           # Migration revisions (empty)
-    └── app/
-        ├── __init__.py
-        ├── main.py             # FastAPI application + health endpoint
-        ├── core/
-        │   ├── __init__.py
-        │   └── config.py       # Pydantic settings from .env
-        └── db/
-            ├── __init__.py
-            ├── base.py         # SQLAlchemy DeclarativeBase
-            └── session.py      # Async engine + session factory
+    │   ├── env.py
+    │   └── versions/
+    │       └── 2fef91c74a30_create_clinics_and_users.py
+    ├── app/
+    │   ├── main.py
+    │   ├── api/
+    │   │   ├── __init__.py
+    │   │   └── auth.py              # Register, Login, Me endpoints
+    │   ├── core/
+    │   │   ├── config.py            # App settings (Pydantic)
+    │   │   └── security.py          # Argon2 hashing, HS256 JWT, get_current_user
+    │   ├── db/
+    │   │   ├── base.py              # DeclarativeBase
+    │   │   └── session.py           # Async engine & sessionmaker
+    │   ├── models/
+    │   │   ├── __init__.py
+    │   │   ├── clinic.py            # Clinic model
+    │   │   └── user.py              # User model (clinic FK, role, hash)
+    │   ├── schemas/
+    │   │   ├── __init__.py
+    │   │   └── auth.py              # Pydantic schemas (requests/responses)
+    │   └── services/
+    │       ├── __init__.py
+    │       └── auth_service.py      # Business logic (register, authenticate)
+    └── tests/
+        ├── conftest.py              # Async test fixtures, separate DB, NullPool
+        └── test_auth.py             # 16 test cases
 ```
-
----
-
-## Troubleshooting
-
-### "Connection refused" on health check
-
-- Verify PostgreSQL is running: open **Services** (`services.msc`) and check that the PostgreSQL service status is **Running**.
-- Verify the `DATABASE_URL` in `.env` has the correct password.
-- Verify the `ai_patient_frontdesk` database exists by connecting with `psql -U postgres -l`.
-
-### Alembic import errors or connection failures
-
-- Ensure you're running `alembic` from the `backend/` directory.
-- Ensure your virtual environment is activated.
-- Ensure `.env` file exists in `backend/` with the correct `DATABASE_URL`.
-
-### `psql` is not recognized
-
-Add PostgreSQL bin directory to your PATH:
-
-```powershell
-$env:PATH += ";C:\Program Files\PostgreSQL\17\bin"
-```
-
-Or use the full path:
-
-```powershell
-& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres
-```
-
-### `uvicorn` not found
-
-Ensure the virtual environment is activated:
-
-```powershell
-.\venv\Scripts\Activate.ps1
-```
-
-Your prompt should show `(venv)` prefix.
-
-### `Activate.ps1 cannot be loaded`
-
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
-
----
-
-## Next Phase
-
-**Phase 2: Authentication & Multi-tenancy** — User registration, login, JWT, clinic creation, tenant isolation.
-
-Do not proceed until Phase 1 is confirmed working.

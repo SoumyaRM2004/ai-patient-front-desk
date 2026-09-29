@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from app.api.auth import router as auth_router
 from app.core.config import settings
 from app.db.session import async_session_factory, engine
 
@@ -31,6 +32,8 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+
+app.include_router(auth_router)
 
 
 @app.get("/api/v1/health", tags=["health"])

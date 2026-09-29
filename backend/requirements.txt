@@ -5,3 +5,5 @@ asyncpg
 alembic
 pydantic-settings
 python-dotenv
+pwdlib[argon2]
+PyJWT
