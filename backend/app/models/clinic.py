@@ -10,7 +10,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.appointment import Appointment
     from app.models.doctor import Doctor
+    from app.models.patient import Patient
     from app.models.service import Service
     from app.models.user import User
 
@@ -23,6 +25,12 @@ class Clinic(Base):
         default=uuid.uuid4,
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    timezone: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="Asia/Kolkata",
+        server_default="Asia/Kolkata",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -49,6 +57,16 @@ class Clinic(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    patients: Mapped[list[Patient]] = relationship(
+        back_populates="clinic",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    appointments: Mapped[list[Appointment]] = relationship(
+        back_populates="clinic",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     def __repr__(self) -> str:
-        return f"<Clinic id={self.id} name={self.name!r}>"
+        return f"<Clinic id={self.id} name={self.name!r} timezone={self.timezone!r}>"

@@ -5,8 +5,10 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from app.api.appointments import router as appointments_router
 from app.api.auth import router as auth_router
 from app.api.doctors import router as doctors_router
+from app.api.patients import router as patients_router
 from app.api.services import router as services_router
 from app.core.config import settings
 from app.db.session import async_session_factory, engine
@@ -38,6 +40,8 @@ app = FastAPI(
 app.include_router(auth_router)
 app.include_router(doctors_router)
 app.include_router(services_router)
+app.include_router(patients_router)
+app.include_router(appointments_router)
 
 
 @app.get("/api/v1/health", tags=["health"])

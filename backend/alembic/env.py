@@ -29,6 +29,8 @@ from app.models.user import User  # noqa: F401
 from app.models.doctor import Doctor  # noqa: F401
 from app.models.service import Service  # noqa: F401
 from app.models.doctor_working_hour import DoctorWorkingHour  # noqa: F401
+from app.models.patient import Patient  # noqa: F401
+from app.models.appointment import Appointment  # noqa: F401
 
 target_metadata = Base.metadata
 

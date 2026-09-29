@@ -101,7 +101,14 @@ async def delete_doctor(
     """Delete a doctor. Dependent working hours cascade at the database level."""
     doctor = await get_doctor_by_id(db, clinic_id=clinic_id, doctor_id=doctor_id)
 
-    await db.delete(doctor)
-    await db.commit()
+    try:
+        await db.delete(doctor)
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete doctor with existing appointments",
+        ) from exc
 
     logger.info("Deleted doctor %s for clinic %s", doctor_id, clinic_id)

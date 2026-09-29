@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -12,11 +12,10 @@ from app.db.base import Base
 if TYPE_CHECKING:
     from app.models.appointment import Appointment
     from app.models.clinic import Clinic
-    from app.models.doctor_working_hour import DoctorWorkingHour
 
 
-class Doctor(Base):
-    __tablename__ = "doctors"
+class Patient(Base):
+    __tablename__ = "patients"
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
@@ -26,10 +25,12 @@ class Doctor(Base):
         ForeignKey("clinics.id", ondelete="CASCADE"),
         nullable=False,
     )
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    specialty: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[str] = mapped_column(String(50), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    date_of_birth: Mapped[date | None] = mapped_column(Date, nullable=True)
+    gender: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -46,20 +47,17 @@ class Doctor(Base):
     )
 
     # Relationships
-    clinic: Mapped[Clinic] = relationship(back_populates="doctors")
-    working_hours: Mapped[list[DoctorWorkingHour]] = relationship(
-        back_populates="doctor",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
-    )
+    clinic: Mapped[Clinic] = relationship(back_populates="patients")
     appointments: Mapped[list[Appointment]] = relationship(
-        back_populates="doctor",
+        back_populates="patient",
         passive_deletes=True,
     )
 
     __table_args__ = (
-        Index("ix_doctors_clinic_id", "clinic_id"),
+        UniqueConstraint("clinic_id", "phone", name="uq_patients_clinic_phone"),
+        Index("ix_patients_clinic_id", "clinic_id"),
+        Index("ix_patients_clinic_phone", "clinic_id", "phone"),
     )
 
     def __repr__(self) -> str:
-        return f"<Doctor id={self.id} name={self.name!r} clinic_id={self.clinic_id}>"
+        return f"<Patient id={self.id} full_name={self.full_name!r} clinic_id={self.clinic_id}>"

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.appointment import Appointment
     from app.models.clinic import Clinic
 
 
@@ -46,6 +47,10 @@ class Service(Base):
 
     # Relationships
     clinic: Mapped[Clinic] = relationship(back_populates="services")
+    appointments: Mapped[list[Appointment]] = relationship(
+        back_populates="service",
+        passive_deletes=True,
+    )
 
     __table_args__ = (
         Index("ix_services_clinic_id", "clinic_id"),

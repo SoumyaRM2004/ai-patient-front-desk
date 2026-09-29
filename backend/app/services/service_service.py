@@ -101,7 +101,14 @@ async def delete_service(
     """Delete a service belonging to the specified clinic."""
     service = await get_service_by_id(db, clinic_id=clinic_id, service_id=service_id)
 
-    await db.delete(service)
-    await db.commit()
+    try:
+        await db.delete(service)
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete service with existing appointments",
+        ) from exc
 
     logger.info("Deleted service %s for clinic %s", service_id, clinic_id)
